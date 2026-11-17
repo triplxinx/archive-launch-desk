@@ -21,7 +21,7 @@
     <form id="sign-in"><label>Email address<input name="email" type="email" autocomplete="email" required></label><button type="submit">Email me a sign-in link</button></form>
   </section>
   <div id="workspace" hidden>
-    <nav class="tabs" aria-label="Workspace"><button type="button" data-tab="leads" aria-pressed="true">Opportunities</button><button type="button" data-tab="projects" aria-pressed="false">Projects</button><button type="button" data-tab="portfolio" aria-pressed="false">Portfolio</button></nav>
+    <nav class="tabs" aria-label="Workspace"><button type="button" data-tab="leads" aria-pressed="true">Opportunities</button><button type="button" data-tab="projects" aria-pressed="false">Projects</button><button type="button" data-tab="portfolio" aria-pressed="false">Portfolio</button><button type="button" data-tab="imports" aria-pressed="false">Import images</button></nav>
     <section id="leads" aria-labelledby="leads-title">
       <div class="toolbar"><div><h2 id="leads-title">Opportunities</h2><p id="lead-count"></p></div><label>Filter<select id="filter"><option value="">All available</option><option value="paid">Posted pay</option><option value="saved">Saved or in progress</option></select></label></div>
       <div id="lead-list" class="cards"></div>
@@ -40,6 +40,21 @@
         <button type="submit">Add sample</button>
       </form></div>
       <div id="asset-list" class="cards"></div>
+    </section>
+    <section id="imports" aria-labelledby="imports-title" hidden>
+      <h2 id="imports-title">Import images</h2>
+      <div class="panel import-controls">
+        <label>Choose files or downloaded Google Photos images<input id="import-local" type="file" accept="image/*" multiple></label>
+        <label>Google Photos album label<input id="google-album" type="text" maxlength="100" placeholder="Use the same label to resume this album"></label>
+        <div class="buttons">
+          <button id="google-start" type="button">Connect Google Photos</button>
+          <a id="google-picker" target="_blank" rel="noopener noreferrer" hidden>Open Google Photos picker ↗</a>
+        </div>
+        <label class="check"><input id="import-upscale" type="checkbox"> Apply 4× width and height to this batch</label>
+        <div class="buttons"><button id="import-upload" type="button" disabled>Upload selected</button><button id="import-next" type="button" disabled>Select next 50</button></div>
+        <p id="import-message" role="status" aria-live="polite"></p>
+      </div>
+      <div id="import-queue" class="cards import-grid"></div>
     </section>
     <footer><button id="export" type="button">Export my workspace</button></footer>
   </div>
@@ -61,5 +76,27 @@
     </form>
   </article>
 </template>
+<template id="import-card-template">
+  <article class="card import-card">
+    <img alt="" loading="lazy" decoding="async" hidden>
+    <label class="check"><input class="image-selected" type="checkbox" checked><span class="image-name"></span></label>
+    <p class="image-state" aria-live="polite"></p>
+    <button class="edit-image" type="button">Crop / upscale</button>
+  </article>
+</template>
+<dialog id="import-preview" aria-labelledby="crop-title">
+  <h2 id="crop-title">Crop and upscale</h2><p>Drag on the image to crop, or adjust the bounds below.</p>
+  <div class="crop-stage"><img id="crop-image" alt="Image crop preview" hidden><div id="crop-outline"></div></div>
+  <form id="image-crop">
+    <div class="crop-fields">
+      <label>Left %<input name="left" type="number" min="0" max="99" required></label>
+      <label>Top %<input name="top" type="number" min="0" max="99" required></label>
+      <label>Width %<input name="width" type="number" min="1" max="100" required></label>
+      <label>Height %<input name="height" type="number" min="1" max="100" required></label>
+    </div>
+    <label class="check"><input name="scale" type="checkbox"> 4× width and height</label>
+    <div class="buttons"><button type="submit">Use these edits</button><button id="crop-reset" type="button">Reset edits</button><button id="crop-cancel" type="button">Cancel</button></div>
+  </form>
+</dialog>
 </body>
 </html>

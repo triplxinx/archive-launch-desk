@@ -12,7 +12,7 @@ A standalone, mobile-friendly lead desk for photographers and visual freelancers
 
 ## Deploy
 
-1. Create a Supabase project that you control. In its SQL Editor, run [001_archive.sql](supabase/migrations/001_archive.sql), then [002_pitch_projects.sql](supabase/migrations/002_pitch_projects.sql). If 001 is already installed, apply only 002.
+1. Create a Supabase project that you control. In its SQL Editor, run [001_archive.sql](supabase/migrations/001_archive.sql), then [002_pitch_projects.sql](supabase/migrations/002_pitch_projects.sql). Then apply [003_private_portfolio_images.sql](supabase/migrations/003_private_portfolio_images.sql). For an existing project, apply only migrations you have not run.
 2. In GitHub for this repository, open **Settings → Pages**. Select **Deploy from a branch**, **main**, and **/docs**, then save. The expected project URL is https://triplxinx.github.io/archive-launch-desk/.
 3. In Supabase **Authentication → URL Configuration**, set the Site URL and allowed redirect URL to the published site, including its trailing slash. For beta users outside the project team, configure a custom SMTP provider and verify mail delivery before inviting them. See [Supabase custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp).
 4. Edit [docs/config.js](docs/config.js) with the project URL and the **publishable** key. These two client values are intended to be visible in the browser. Keep the service-role key out of this file and all tracked files.
@@ -40,4 +40,12 @@ Use employer public boards only where the intended collection and product use ar
 
 ## Beta scope
 
-The portfolio currently stores links, names and tags. Direct image upload, wider source connectors, billing, native Android sync, and client-data import are future work. The app shows a setup panel until Supabase is configured. Confirm the live database policies and background run before opening the beta.
+The portfolio stores private images, links, names and tags. Wider source connectors, billing, native Android sync, and workspace backup import are future work. The app shows a setup panel until Supabase is configured. Confirm the live database policies and background run before opening the beta.
+
+## Portfolio image imports
+
+Use **Import images** to select local files, optionally crop or upscale, then upload. The first 50 are selected automatically. After the batch is complete, **Select next 50** advances the queue. Preview loading and uploads continue while you switch dashboard tabs. Keep the dashboard open until uploads finish.
+
+The **Crop / upscale** dialog supports dragging on the preview or entering percentage bounds. Without edits it uploads the original. The optional 4× mode resizes both dimensions with browser resampling, so it does not generate new detail. Outputs above the browser's 40-megapixel edit budget are rejected. Crop tighter or switch off upscale. The storage bucket is private, with up to 50 MiB per image subject to your project's storage limit.
+
+For Google Photos, enable the Photos Picker API in your Google project, create a web OAuth client, add your Pages site's origin as an authorized JavaScript origin, and set its public client ID as **googlePhotosClientId** in **docs/config.js**. Configure the OAuth consent screen and test users as needed. Open the picker, choose the album photos you authorize, then return to the dashboard. Enter the same album label when you reselect it in the same dashboard tab; progress is remembered for files Google returns with the same IDs. If Picker access is unavailable, download the photos and select those files locally. Tokens stay in memory, and uploaded images remain private to your workspace.

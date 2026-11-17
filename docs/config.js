@@ -1,1 +1,1 @@
-export const config = { supabaseUrl: "", supabasePublishableKey: "" };
+export const config = { supabaseUrl: "", supabasePublishableKey: "", googlePhotosClientId: "" };

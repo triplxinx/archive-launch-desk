@@ -1,3 +1,4 @@
+import { initImageImports } from "./image-imports.mjs";
 
 import { config } from "./config.js";
 
@@ -7,6 +8,22 @@ const [setup, auth, workspace, notice] = ["#setup", "#auth", "#workspace", "#not
 let api, user, leads = [], assets = [], drafts = new Map();
 let versions = [];
 let revision = 0;
+const previews = new IntersectionObserver(entries => {
+  for (const entry of entries) if (entry.isIntersecting) {
+    const img = entry.target;
+    previews.unobserve(img);
+    const current = revision;
+    api.storage.from("portfolio-images").createSignedUrl(img.dataset.path,900).then(({data,error}) => {
+      if (!error && current === revision && img.isConnected) img.src = data.signedUrl;
+    }).catch(() => {});
+  }
+},{rootMargin:"240px"});
+const imageImports = initImageImports({
+  getUser:() => user,getClient:() => api,googleClientId:config.googlePhotosClientId,
+  onSaved:asset => {
+    assets = [asset,...assets.filter(item => item.id !== asset.id)];
+  }
+});
 const draftFields = ["status","portfolio","scope","followup","quote"];
 
 function notify(message, error = false) {
@@ -76,6 +93,7 @@ function selectTab(id) {
     tab.setAttribute("aria-pressed",String(selected));
     $("#" + tab.dataset.tab).hidden = !selected;
   }
+  if (id === "portfolio") renderAssets();
 }
 
 function filename(version) {
@@ -258,6 +276,7 @@ function renderLeads(snapshot) {
 
 function renderAssets() {
   const list = $("#asset-list");
+  previews.disconnect();
   list.replaceChildren();
   for (const asset of assets) {
     const card = document.createElement("article");
@@ -271,11 +290,23 @@ function renderAssets() {
     remove.textContent = "Remove sample";
     remove.onclick = async () => {
       remove.disabled = true;
+      if (asset.storage_path) {
+        const removed = await api.storage.from("portfolio-images").remove([asset.storage_path]);
+        if (removed.error) { notify(removed.error.message,true); remove.disabled = false; return; }
+      }
       const {error} = await api.from("portfolio_assets").delete().eq("id", asset.id);
       if (error) { notify(error.message, true); remove.disabled = false; return; }
       assets = assets.filter(item => item.id !== asset.id);
       renderAssets(); renderLeads();
     };
+    if (asset.storage_path) {
+      const image = document.createElement("img");
+      image.alt = asset.title;
+      image.className = "portfolio-preview";
+      image.loading = "lazy"; image.decoding = "async";
+      image.dataset.path = asset.storage_path;
+      card.append(image); previews.observe(image);
+    }
     card.append(title, detail);
     if (safeLink(asset.url)) {
       const link = document.createElement("a");
@@ -306,6 +337,7 @@ async function readVersions(columns = "*") {
 
 async function loadWorkspace(session) {
   const current = ++revision;
+  imageImports.reset(); previews.disconnect();
   user = session?.user ?? null;
   auth.hidden = Boolean(user);
   workspace.hidden = true;
