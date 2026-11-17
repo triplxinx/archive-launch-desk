@@ -1,3 +1,4 @@
+import {buildPitchContext,generatePitchPlans,stopLocalAI} from "./local-ai.mjs";
 import { initImageImports } from "./image-imports.mjs";
 
 import { config } from "./config.js";
@@ -24,6 +25,11 @@ const imageImports = initImageImports({
     assets = [asset,...assets.filter(item => item.id !== asset.id)];
   }
 });
+const localAI = $("#local-ai-enabled");
+localAI.onchange = () => {
+  if (!localAI.checked) stopLocalAI();
+  for (const panel of document.querySelectorAll(".ai-panel")) panel.hidden = !localAI.checked;
+};
 const draftFields = ["status","portfolio","scope","followup","quote"];
 
 function notify(message, error = false) {
@@ -210,6 +216,8 @@ function renderLeads(snapshot) {
     const regenerate = inCard(".regenerate");
     const archiveButton = inCard(".archive");
     const versionLabel = inCard(".pitch-version");
+    const aiPanel = inCard(".ai-panel");
+    aiPanel.hidden = !localAI.checked;
     let busy = false, request;
     function fill(draft) {
       for (const field of draftFields) form.elements.namedItem(field).value = draft[field] ?? "";
@@ -270,6 +278,58 @@ function renderLeads(snapshot) {
         notify("New draft ready. Archive it to start a lead project.");
       }
     };
+    const aiButton = inCard(".ai-generate");
+    const aiStatus = inCard(".ai-status");
+    const aiPlans = inCard(".ai-plans");
+    const criteria = inCard(".ai-criteria");
+    aiButton.onclick = async () => {
+      if (!localAI.checked || !user) return;
+      const wanted = tags([...lead.tags ?? [],lead.title,criteria.value]);
+      const candidates = assets.filter(asset => asset.draft_allowed).map(asset => ({
+        asset,rank:[...tags([asset.title,...asset.tags ?? []])].filter(tag => wanted.has(tag)).length
+      })).sort((a,b) => b.rank - a.rank).map(item => item.asset);
+      const context = buildPitchContext(lead,criteria.value,candidates);
+      aiButton.disabled = true;
+      aiPlans.replaceChildren();
+      try {
+        const plans = await generatePitchPlans(context,message => { aiStatus.textContent = message; });
+        if (!localAI.checked || !form.isConnected) return;
+        aiStatus.textContent = "Review these suggestions before using a plan.";
+        for (const plan of plans) {
+          const card = document.createElement("article");
+          card.className = "ai-plan";
+          const name = document.createElement("h4");
+          name.textContent = plan.title;
+          const rationale = document.createElement("p");
+          rationale.textContent = plan.rationale;
+          const samples = document.createElement("p");
+          samples.textContent = plan.assets.length ? "Suggested samples: " + plan.assets.map(asset => asset.title).join(", ")
+            : "No approved sample was selected for this plan.";
+          const outputs = document.createElement("ul");
+          for (const output of plan.deliverables) {
+            const item = document.createElement("li");
+            item.textContent = output;
+            outputs.append(item);
+          }
+          const pitch = document.createElement("p");
+          pitch.textContent = plan.pitch;
+          const apply = document.createElement("button");
+          apply.type = "button";
+          apply.textContent = "Use this plan";
+          apply.onclick = () => {
+            if (!localAI.checked || busy || !user) return;
+            const scope = ["Suggested deliverables:",...plan.deliverables.map(item => "- " + item),
+              ...(plan.assets.length ? ["","Suggested portfolio samples:",...plan.assets.map(asset => "- " + asset.title)] : [])].join("\n");
+            const updated = {...readDraft(),portfolio:plan.pitch,scope};
+            if (versions.some(version => version.lead_id === lead.id)) write(updated,true);
+            else { fill(updated); notify("Plan loaded. Archive it to start a lead project."); }
+          };
+          card.append(name,rationale,samples,outputs,pitch,apply);
+          aiPlans.append(card);
+        }
+      } catch (error) { aiStatus.textContent = error.message || "Local generation failed."; }
+      finally { aiButton.disabled = false; }
+    };
     list.append(node);
   }
 }
@@ -308,6 +368,26 @@ function renderAssets() {
       card.append(image); previews.observe(image);
     }
     card.append(title, detail);
+    const metadata = document.createElement("details");
+    metadata.className = "asset-metadata";
+    metadata.innerHTML = '<summary>Pitch metadata</summary><form><label>Tags<input name="tags" type="text" maxlength="240"></label><label class="check"><input name="approved" type="checkbox"> Allow this sample’s title and tags in pitch suggestions</label><button type="submit">Save metadata</button></form>';
+    const form = metadata.querySelector("form");
+    form.elements.tags.value = (asset.tags ?? []).join(", ");
+    form.elements.approved.checked = asset.draft_allowed;
+    bindForm(form,async fields => {
+      const current = revision;
+      const tags = [...new Set(fields.get("tags").split(",").map(tag => tag.trim().toLowerCase()).filter(Boolean))].slice(0,20);
+      if (tags.join(",").length > 240) throw Error("Use fewer or shorter tags.");
+      const {data,error} = await api.from("portfolio_assets").update({
+        tags,draft_allowed:fields.get("approved") === "on"
+      }).eq("id",asset.id).select().single();
+      if (error) throw error;
+      if (current !== revision) return;
+      assets = assets.map(item => item.id === data.id ? data : item);
+      detail.textContent = (data.tags ?? []).join(", ") || "No tags";
+      notify("Pitch metadata saved.");
+    });
+    card.append(metadata);
     if (safeLink(asset.url)) {
       const link = document.createElement("a");
       link.href = safeLink(asset.url);
@@ -338,6 +418,7 @@ async function readVersions(columns = "*") {
 async function loadWorkspace(session) {
   const current = ++revision;
   imageImports.reset(); previews.disconnect();
+  stopLocalAI(); localAI.checked = false;
   user = session?.user ?? null;
   auth.hidden = Boolean(user);
   workspace.hidden = true;

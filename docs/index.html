@@ -21,6 +21,11 @@
     <form id="sign-in"><label>Email address<input name="email" type="email" autocomplete="email" required></label><button type="submit">Email me a sign-in link</button></form>
   </section>
   <div id="workspace" hidden>
+    <details class="panel ai-settings">
+      <summary>Local AI settings</summary>
+      <label class="check"><input id="local-ai-enabled" type="checkbox"> Enable on-device pitch suggestions for this session</label>
+      <p>First use downloads a model. It uses approved sample titles and tags with your lead criteria. Images and links stay out of the prompt.</p>
+    </details>
     <nav class="tabs" aria-label="Workspace"><button type="button" data-tab="leads" aria-pressed="true">Opportunities</button><button type="button" data-tab="projects" aria-pressed="false">Projects</button><button type="button" data-tab="portfolio" aria-pressed="false">Portfolio</button><button type="button" data-tab="imports" aria-pressed="false">Import images</button></nav>
     <section id="leads" aria-labelledby="leads-title">
       <div class="toolbar"><div><h2 id="leads-title">Opportunities</h2><p id="lead-count"></p></div><label>Filter<select id="filter"><option value="">All available</option><option value="paid">Posted pay</option><option value="saved">Saved or in progress</option></select></label></div>
@@ -72,6 +77,13 @@
       <label>Follow-up<textarea name="followup" rows="3" maxlength="6000"></textarea></label>
       <label>Quote<textarea name="quote" rows="3" maxlength="6000" placeholder="Fee, currency, deliverables, and usage terms"></textarea></label>
       <div class="buttons"><button type="submit">Save drafts and status</button><button type="button" class="regenerate">Generate new pitch</button></div>
+      <details class="ai-panel" hidden>
+        <summary>Local AI asset and deliverable plans</summary>
+        <label>Lead criteria <small>Optional. Paste the brief, required formats, or usage.</small><textarea class="ai-criteria" maxlength="900" rows="3"></textarea></label>
+        <button type="button" class="ai-generate">Suggest plans</button>
+        <p class="ai-status" role="status"></p>
+        <div class="ai-plans"></div>
+      </details>
       <button type="button" class="archive">↓ Archive pitch and quote <small>Tap or swipe down here</small></button>
     </form>
   </article>
