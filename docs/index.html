@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#182222">
+<meta name="description" content="A private lead desk for photographers and visual freelancers.">
+<title>Archive Launch Desk</title>
+<link rel="stylesheet" href="./style.css">
+<link rel="manifest" href="./manifest.webmanifest">
+<script type="module" src="./app.mjs"></script>
+</head>
+<body>
+<header class="top"><a class="brand" href="./">Archive <span>Launch Desk</span></a><button id="logout" type="button" hidden>Sign out</button></header>
+<main>
+  <section class="intro"><p class="eyebrow">FOR PHOTOGRAPHERS &amp; VISUAL FREELANCERS</p><h1>Find work that fits your portfolio.</h1><p>Review opportunities, pair them with relevant samples, and prepare your next pitch.</p></section>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+  <section id="setup" class="panel" hidden><h2>Workspace setup</h2><p>This deployment needs its Supabase project URL and publishable key. <a href="https://github.com/triplxinx/archive-launch-desk#deploy">Open the setup guide</a>.</p></section>
+  <section id="auth" class="panel" hidden>
+    <h2>Open your private workspace</h2>
+    <form id="sign-in"><label>Email address<input name="email" type="email" autocomplete="email" required></label><button type="submit">Email me a sign-in link</button></form>
+  </section>
+  <div id="workspace" hidden>
+    <nav class="tabs" aria-label="Workspace"><button type="button" data-tab="leads" aria-pressed="true">Opportunities</button><button type="button" data-tab="portfolio" aria-pressed="false">Portfolio</button></nav>
+    <section id="leads" aria-labelledby="leads-title">
+      <div class="toolbar"><div><h2 id="leads-title">Opportunities</h2><p id="lead-count"></p></div><label>Filter<select id="filter"><option value="">All available</option><option value="paid">Posted pay</option><option value="saved">Saved or in progress</option></select></label></div>
+      <div id="lead-list" class="cards"></div>
+    </section>
+    <section id="portfolio" aria-labelledby="portfolio-title" hidden>
+      <div class="toolbar"><div><h2 id="portfolio-title">Portfolio references</h2><p>Use tags to match samples to work. Links stay in your workspace.</p></div></div>
+      <div class="panel"><form id="add-asset">
+        <label>Sample name<input name="title" maxlength="140" required></label>
+        <label>Optional portfolio link<input name="url" type="url" maxlength="1500" placeholder="https://"></label>
+        <label>Tags<input name="tags" maxlength="240" placeholder="street photography, editorial, Seattle"></label>
+        <label class="check"><input name="approved" type="checkbox"> Include this sample’s name in generated drafts</label>
+        <button type="submit">Add sample</button>
+      </form></div>
+      <div id="asset-list" class="cards"></div>
+    </section>
+    <footer><button id="export" type="button">Export my workspace</button></footer>
+  </div>
+</main>
+<template id="lead-template">
+  <article class="card">
+    <div class="meta"><span class="source"></span><span class="payment"></span></div>
+    <h3></h3><p class="company"></p><p class="matches"></p>
+    <div class="buttons"><a class="apply" target="_blank" rel="noopener noreferrer">Open original listing ↗</a><button class="edit" type="button">Open pitch</button></div>
+    <form class="pitch" hidden>
+      <label>Status<select name="status"><option value="saved">Saved</option><option value="drafting">Drafting</option><option value="applied">Applied</option><option value="reply">Replied</option><option value="won">Won</option><option value="closed">Closed</option></select></label>
+      <label>Portfolio pitch<textarea name="portfolio" rows="4" maxlength="6000"></textarea></label>
+      <label>Scope pitch<textarea name="scope" rows="4" maxlength="6000"></textarea></label>
+      <label>Follow-up<textarea name="followup" rows="3" maxlength="6000"></textarea></label>
+      <div class="buttons"><button type="submit">Save drafts and status</button></div>
+    </form>
+  </article>
+</template>
+</body>
+</html>

@@ -1,0 +1,22 @@
+[
+  {
+    "provider": "ashby",
+    "slug": "terac",
+    "company": "Terac"
+  },
+  {
+    "provider": "ashby",
+    "slug": "handshake",
+    "company": "Handshake"
+  },
+  {
+    "provider": "ashby",
+    "slug": "true-talent-solutions-partners",
+    "company": "True Talent Solutions Partners"
+  },
+  {
+    "provider": "lever",
+    "slug": "gettyimages",
+    "company": "Getty Images"
+  }
+]
