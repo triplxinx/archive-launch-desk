@@ -1,7 +1,10 @@
 
 const root = "https://photospicker.googleapis.com/v1/";
 const scope = "https://www.googleapis.com/auth/photospicker.mediaitems.readonly";
-let gis;
+let gis, token;
+let accountRevision = 0;
+
+export function clearGooglePhotosToken() { token = undefined; accountRevision++; }
 
 async function library() {
   if (window.google?.accounts?.oauth2) return window.google.accounts.oauth2;
@@ -17,21 +20,31 @@ async function library() {
 }
 
 export async function beginPicker(clientId, signal) {
-  const google = await library();
-  signal.throwIfAborted();
-  const auth = await new Promise((resolve,reject) => {
-    const token = google.initTokenClient({
-      client_id:clientId,scope,
-      callback:result => result.access_token ? resolve(result.access_token) : reject(Error(result.error || "Google sign-in failed.")),
-      error_callback:() => reject(Error("Google sign-in closed or was blocked. Try again."))
+  const revision = accountRevision;
+  let auth = token?.clientId === clientId && token.expires > Date.now() + 60000 ? token.value : "";
+  if (!auth) {
+    const google = await library();
+    signal.throwIfAborted();
+    const granted = await new Promise((resolve,reject) => {
+      const client = google.initTokenClient({
+        client_id:clientId,scope,
+        callback:result => result.access_token && google.hasGrantedAllScopes(result,scope)
+          ? resolve(result) : reject(Error(result.error || "Google Photos permission was not granted.")),
+        error_callback:() => reject(Error("Google sign-in closed or was blocked. Try again."))
+      });
+      client.requestAccessToken({prompt:""});
     });
-    token.requestAccessToken();
-  });
+    signal.throwIfAborted();
+    if (revision !== accountRevision) throw Error("The workspace changed. Connect Google Photos again.");
+    auth = granted.access_token;
+    token = {clientId,value:auth,expires:Date.now() + 1000 * (Number(granted.expires_in) || 0)};
+  }
   async function fetchPicker(path, method = "GET") {
     const response = await fetch(root + path,{
       method,signal,headers:{Authorization:"Bearer " + auth,...(method === "POST" ? {"Content-Type":"application/json"} : {})},
       body:method === "POST" ? "{}" : undefined
     });
+    if (response.status === 401 && token?.value === auth) token = undefined;
     if (!response.ok) throw Error("Google Photos request failed (" + response.status + "). Try selecting again.");
     return response.json();
   }
@@ -69,6 +82,7 @@ export async function beginPicker(clientId, signal) {
               const response = await fetch(base.href + (thumbnail ? "=w480-h480" : "=d"),{
                 signal:requestSignal,headers:{Authorization:"Bearer " + auth}
               });
+              if (response.status === 401 && token?.value === auth) token = undefined;
               if (!response.ok) throw Error("Google photo expired or could not be downloaded. Select it again or import a downloaded copy.");
               return response.blob();
             }

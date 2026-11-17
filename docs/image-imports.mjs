@@ -1,5 +1,5 @@
 
-import {beginPicker} from "./photos-picker.mjs";
+import {beginPicker,clearGooglePhotosToken} from "./photos-picker.mjs";
 
 export const batchSize = 50;
 const limit = 50 * 1024 * 1024;
@@ -84,6 +84,7 @@ export function initImageImports({getUser,getClient,onSaved,googleClientId}) {
   }
 
   function reset() {
+    clearGooglePhotosToken();
     pickerController.abort();
     pickerController = new AbortController();
     clearBatch();
