@@ -12,7 +12,7 @@ A standalone, mobile-friendly lead desk for photographers and visual freelancers
 
 ## Deploy
 
-1. Create a Supabase project that you control. In its SQL Editor, run [001_archive.sql](supabase/migrations/001_archive.sql) once on the new project.
+1. Create a Supabase project that you control. In its SQL Editor, run [001_archive.sql](supabase/migrations/001_archive.sql), then [002_pitch_projects.sql](supabase/migrations/002_pitch_projects.sql). If 001 is already installed, apply only 002.
 2. In GitHub for this repository, open **Settings → Pages**. Select **Deploy from a branch**, **main**, and **/docs**, then save. The expected project URL is https://triplxinx.github.io/archive-launch-desk/.
 3. In Supabase **Authentication → URL Configuration**, set the Site URL and allowed redirect URL to the published site, including its trailing slash. For beta users outside the project team, configure a custom SMTP provider and verify mail delivery before inviting them. See [Supabase custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp).
 4. Edit [docs/config.js](docs/config.js) with the project URL and the **publishable** key. These two client values are intended to be visible in the browser. Keep the service-role key out of this file and all tracked files.
@@ -20,6 +20,12 @@ A standalone, mobile-friendly lead desk for photographers and visual freelancers
 6. Sign in with two separate test accounts. Confirm each can save a sample and a draft, each sees only its own data, sign-out clears the workspace view, and workspace export includes only the signed-in customer’s records.
 
 The cron is preset to 16:17 UTC. The sync step skips if the repository has no SUPABASE_URL variable. Public-repository schedules can pause after 60 days of inactivity. For a production deployment, use a dedicated scheduled worker or private workflow and alert on missed runs.
+
+## Pitch projects
+
+Open any lead's pitch editor to start with a draft based on the lead and matching portfolio tags. Add an optional quote. Swipe down on the **Archive pitch and quote** strip, or tap it, to save version 1 and create the lead project. After a project exists, **Generate new pitch** archives a new version and carries forward the editable quote. Generation uses templates and leaves prices for you to enter.
+
+The **Projects** tab links back to each exact archived version. Use **Download** for a Markdown copy. Editing a reopened version and saving updates the working draft. Archiving saves a separate version. Archived snapshots are included in workspace exports and stay behind the workspace's sign-in.
 
 ## Run the scout on your own machine
 

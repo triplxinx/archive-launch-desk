@@ -5,7 +5,9 @@ const $ = selector => document.querySelector(selector);
 const tags = value => new Set((value ?? []).flatMap(tag => tag.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []));
 const [setup, auth, workspace, notice] = ["#setup", "#auth", "#workspace", "#notice"].map($);
 let api, user, leads = [], assets = [], drafts = new Map();
+let versions = [];
 let revision = 0;
+const draftFields = ["status","portfolio","scope","followup","quote"];
 
 function notify(message, error = false) {
   notice.textContent = message;
@@ -33,6 +35,7 @@ function starter(lead) {
   const hello = "Hi " + lead.company + ", ";
   return {
     status: "drafting",
+    quote: "",
     portfolio: hello + "I’m interested in " + lead.title + "." +
       (sample ? " A relevant portfolio sample is " + sample + "." : "") +
       " Could you share the deliverables, timeline, and intended usage?",
@@ -41,6 +44,19 @@ function starter(lead) {
     followup: hello + "I’m following up on " + lead.title +
       ". I’d be happy to send a scoped proposal if you’re still reviewing."
   };
+}
+
+function nextPitch(lead, current, nextVersion) {
+  const generated = {...starter(lead), status:current.status, quote:current.quote};
+  if (nextVersion % 2 === 0) {
+    const sample = matches(lead).find(match => match.asset.draft_allowed)?.asset.title;
+    generated.portfolio = "Hi " + lead.company + ", I’m reaching out about " + lead.title + "." +
+      (sample ? " I can share " + sample + " as a starting point." : "") +
+      " What would you want to see in a first delivery, and when would you need it?";
+    generated.scope = "Hi " + lead.company + ", if " + lead.title + " is still open, I can quote a small first " +
+      "milestone. Could you share the intended usage, deliverable format, and review process?";
+  }
+  return generated;
 }
 
 function bindForm(form, run) {
@@ -54,10 +70,104 @@ function bindForm(form, run) {
   });
 }
 
-function renderLeads() {
+function selectTab(id) {
+  for (const tab of document.querySelectorAll("[data-tab]")) {
+    const selected = tab.dataset.tab === id;
+    tab.setAttribute("aria-pressed",String(selected));
+    $("#" + tab.dataset.tab).hidden = !selected;
+  }
+}
+
+function filename(version) {
+  const title = version.lead_name.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, "_").trim().slice(0,120) || "lead";
+  return title + "_pitch-v" + version.version + ".md";
+}
+
+function download(name, content, type) {
+  const objectUrl = URL.createObjectURL(new Blob([content],{type}));
+  const link = document.createElement("a");
+  link.href = objectUrl; link.download = name;
+  link.click(); setTimeout(() => URL.revokeObjectURL(objectUrl),1000);
+}
+
+function renderProjects() {
+  const list = $("#project-list");
+  list.replaceChildren();
+  const byLead = new Map();
+  for (const version of versions) {
+    if (!byLead.has(version.lead_id)) byLead.set(version.lead_id, []);
+    byLead.get(version.lead_id).push(version);
+  }
+  for (const history of byLead.values()) {
+    const card = document.createElement("article");
+    card.className = "card";
+    const title = document.createElement("h3");
+    title.textContent = history[0].lead_name;
+    const links = document.createElement("ul");
+    links.className = "project-links";
+    for (const version of history.sort((a,b) => b.version - a.version)) {
+      const entry = document.createElement("li");
+      const link = document.createElement("a");
+      link.href = "#" + new URLSearchParams({lead:version.lead_id,pitch:version.version});
+      link.textContent = filename(version);
+      link.onclick = event => {
+        if (location.hash !== link.hash || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        openPitchLink();
+      };
+      const save = document.createElement("button");
+      save.type = "button";
+      save.textContent = "Download";
+      save.onclick = () => download(filename(version), [
+        "# " + version.lead_name, "## Portfolio pitch\n\n" + version.portfolio,
+        "## Scope pitch\n\n" + version.scope, "## Follow-up\n\n" + version.followup,
+        "## Quote\n\n" + (version.quote || "Quote pending")
+      ].join("\n\n") + "\n", "text/markdown;charset=utf-8");
+      entry.append(link, save); links.append(entry);
+    }
+    card.append(title, links); list.append(card);
+  }
+  if (!byLead.size) list.textContent = "Archive a pitch to start a lead project.";
+}
+
+function openPitchLink() {
+  if (!user || !location.hash.startsWith("#lead=")) return;
+  const params = new URLSearchParams(location.hash.slice(1));
+  const snapshot = versions.find(version =>
+    version.lead_id === params.get("lead") && String(version.version) === params.get("pitch"));
+  if (!snapshot) return notify("This pitch version is unavailable in your workspace.", true);
+  selectTab("leads");
+  renderLeads(snapshot);
+  $("#pitch-" + snapshot.lead_id)?.focus();
+}
+
+function bindArchiveSwipe(button, archive) {
+  let start, suppressClickUntil = 0;
+  button.onpointerdown = event => {
+    if (event.pointerType !== "touch" || !event.isPrimary) return;
+    start = {id:event.pointerId, x:event.clientX, y:event.clientY};
+    button.setPointerCapture(event.pointerId);
+  };
+  button.onpointercancel = () => { start = undefined; };
+  button.onpointerup = event => {
+    if (start?.id !== event.pointerId) return;
+    const down = event.clientY - start.y;
+    const across = Math.abs(event.clientX - start.x);
+    start = undefined;
+    if (Math.max(Math.abs(down),across) < 15) return;
+    suppressClickUntil = performance.now() + 450;
+    if (down >= 48 && down >= across * 1.5) archive();
+  };
+  button.onclick = event => {
+    if (event.detail === 0 || performance.now() >= suppressClickUntil) archive();
+  };
+}
+
+function renderLeads(snapshot) {
   const filter = $("#filter").value;
   const ranked = leads.map(lead => ({lead, matches: matches(lead)}))
-    .filter(({lead}) => filter === "saved" ? drafts.has(lead.id) : lead.active && (filter !== "paid" || Boolean(lead.posted_pay)))
+    .filter(({lead}) => lead.id === snapshot?.lead_id || (filter === "saved"
+      ? drafts.has(lead.id) : lead.active && (filter !== "paid" || Boolean(lead.posted_pay))))
     .sort((a, b) => Number(Boolean(b.lead.posted_pay)) - Number(Boolean(a.lead.posted_pay)) ||
       (b.matches[0]?.score ?? 0) - (a.matches[0]?.score ?? 0));
   const list = $("#lead-list");
@@ -78,20 +188,70 @@ function renderLeads() {
     inCard(".apply").href = href;
     const form = inCard(".pitch");
     const edit = inCard(".edit");
-    const draft = drafts.get(lead.id) ?? starter(lead);
-    for (const field of ["status","portfolio","scope","followup"]) form.elements.namedItem(field).value = draft[field];
+    const archived = snapshot?.lead_id === lead.id ? snapshot : null;
+    const regenerate = inCard(".regenerate");
+    const archiveButton = inCard(".archive");
+    const versionLabel = inCard(".pitch-version");
+    let busy = false, request;
+    function fill(draft) {
+      for (const field of draftFields) form.elements.namedItem(field).value = draft[field] ?? "";
+      versionLabel.textContent = draft.version ? filename(draft) : "Working draft";
+    }
+    form.id = "pitch-" + lead.id;
+    form.tabIndex = -1;
+    fill(archived ?? drafts.get(lead.id) ?? starter(lead));
+    if (archived) { form.hidden = false; edit.textContent = "Hide pitch"; }
     edit.addEventListener("click", () => {
       form.hidden = !form.hidden;
       edit.textContent = form.hidden ? "Open pitch" : "Hide pitch";
       if (!form.hidden) form.elements.portfolio.focus();
     });
-    bindForm(form, async fields => {
-      const patch = Object.fromEntries(fields);
-      const {error} = await api.from("lead_work").upsert({...patch, user_id:user.id, lead_id:lead.id});
-      if (error) throw error;
-      drafts.set(lead.id, patch);
-      notify("Drafts and status saved.");
-    });
+    async function write(draft, archive) {
+      if (busy || !user) return;
+      busy = true;
+      const current = revision;
+      const controls = [...form.querySelectorAll("button, select, textarea")];
+      controls.forEach(control => { control.disabled = true; });
+      try {
+        if (archive) {
+          const payload = JSON.stringify(draft);
+          if (request?.payload !== payload) request = {payload,id:crypto.randomUUID()};
+          const {data,error} = await api.rpc("archive_pitch",{
+            p_lead_id:lead.id,p_request_id:request.id,p_draft:draft
+          }).single();
+          if (error) throw error;
+          request = undefined;
+          if (current !== revision) return;
+          versions = [data,...versions.filter(item => item.lead_id !== data.lead_id || item.version !== data.version)];
+          drafts.set(lead.id, data);
+          fill(data); renderProjects(); notify("Archived " + filename(data));
+        } else {
+          const {error} = await api.from("lead_work").upsert({...draft,user_id:user.id,lead_id:lead.id});
+          if (error) throw error;
+          if (current !== revision) return;
+          drafts.set(lead.id,draft); fill(draft); notify("Working draft saved.");
+        }
+      } catch (error) {
+        if (current === revision) notify(error.message || "Couldn’t save the pitch. Try again when connected.", true);
+      } finally {
+        busy = false;
+        controls.forEach(control => { control.disabled = false; });
+      }
+    }
+    const readDraft = () => Object.fromEntries(new FormData(form));
+    form.onsubmit = event => { event.preventDefault(); write(readDraft(), false); };
+    bindArchiveSwipe(archiveButton, () => write(readDraft(), true));
+    regenerate.onclick = () => {
+      const current = readDraft();
+      const prior = versions.find(version => version.lead_id === lead.id);
+      const generated = nextPitch(lead,current,(prior?.version ?? 1) + 1);
+      if (prior) {
+        write(generated, true);
+      } else {
+        fill(generated);
+        notify("New draft ready. Archive it to start a lead project.");
+      }
+    };
     list.append(node);
   }
 }
@@ -132,6 +292,18 @@ function renderAssets() {
   }
 }
 
+async function readVersions(columns = "*") {
+  const rows = [];
+  const pageSize = 200;
+  for (let offset = 0; ; offset += pageSize) {
+    const {data,error} = await api.from("pitch_versions").select(columns)
+      .order("lead_id").order("version",{ascending:false}).range(offset,offset + pageSize - 1);
+    if (error) return {error};
+    rows.push(...data);
+    if (data.length < pageSize) return {data:rows};
+  }
+}
+
 async function loadWorkspace(session) {
   const current = ++revision;
   user = session?.user ?? null;
@@ -139,22 +311,27 @@ async function loadWorkspace(session) {
   workspace.hidden = true;
   $("#logout").hidden = !user;
   leads = []; assets = []; drafts = new Map();
+  versions = [];
   $("#lead-list").replaceChildren();
   $("#asset-list").replaceChildren();
+  $("#project-list").replaceChildren();
   if (!user) return;
   const results = await Promise.all([
     api.from("scouted_leads").select().eq("active",true).order("checked_on",{ascending:false}).limit(150),
     api.from("portfolio_assets").select().order("created_at",{ascending:false}),
-    api.from("lead_work").select("*,scouted_leads(*)")
+    api.from("lead_work").select("*,scouted_leads(*)"),
+    readVersions("*,scouted_leads(*)")
   ]);
   if (current !== revision) return;
   const failed = results.find(result => result.error);
   if (failed) return notify(failed.error.message, true);
-  const [dbLeads, dbAssets, dbDrafts] = results.map(result => result.data ?? []);
-  leads = [...new Map([...dbDrafts.map(d => d.scouted_leads).filter(Boolean), ...dbLeads].map(lead => [lead.id, lead])).values()]; assets = dbAssets;
+  const [dbLeads, dbAssets, dbDrafts, dbVersions] = results.map(result => result.data ?? []);
+  versions = dbVersions;
+  const associated = [...dbDrafts,...versions].map(item => item.scouted_leads).filter(Boolean);
+  leads = [...new Map([...associated,...dbLeads].map(lead => [lead.id,lead])).values()]; assets = dbAssets;
   drafts = new Map(dbDrafts.map(draft => [draft.lead_id, draft]));
   workspace.hidden = false;
-  renderLeads(); renderAssets();
+  renderLeads(); renderAssets(); renderProjects(); openPitchLink();
 }
 
 bindForm($("#sign-in"), async fields => {
@@ -178,31 +355,24 @@ bindForm($("#add-asset"), async fields => {
   assets.unshift(data); $("#add-asset").reset();
   renderAssets(); renderLeads(); notify("Portfolio sample added.");
 });
-$("#filter").onchange = renderLeads;
+$("#filter").onchange = () => renderLeads();
+window.addEventListener("hashchange",openPitchLink);
 for (const button of document.querySelectorAll("[data-tab]")) {
-  button.onclick = () => {
-    for (const tab of document.querySelectorAll("[data-tab]")) {
-      const selected = tab === button;
-      tab.setAttribute("aria-pressed",String(selected));
-      $("#" + tab.dataset.tab).hidden = !selected;
-    }
-  };
+  button.onclick = () => selectTab(button.dataset.tab);
 }
 $("#logout").onclick = async () => {
   const {error} = await api.auth.signOut();
   notify(error?.message ?? "", Boolean(error));
 };
 $("#export").onclick = async () => {
-  const results = await Promise.all([api.from("portfolio_assets").select(),api.from("lead_work").select("*,scouted_leads(title,company,url)")]);
+  const results = await Promise.all([api.from("portfolio_assets").select(),
+    api.from("lead_work").select("*,scouted_leads(title,company,url)"),readVersions()]);
   const failure = results.find(result => result.error);
   if (failure) return notify(failure.error.message,true);
-  const objectUrl = URL.createObjectURL(new Blob([JSON.stringify({
+  download("archive-launch-desk-export.json",JSON.stringify({
     exported_at:new Date().toISOString(),
-    portfolio:results[0].data,drafts:results[1].data
-  },null,2)],{type:"application/json"}));
-  const link = document.createElement("a");
-  link.href = objectUrl; link.download = "archive-launch-desk-export.json";
-  link.click(); setTimeout(() => URL.revokeObjectURL(objectUrl),1000);
+    portfolio:results[0].data,drafts:results[1].data,pitch_versions:results[2].data
+  },null,2),"application/json");
 };
 
 async function start() {

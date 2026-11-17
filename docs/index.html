@@ -21,10 +21,14 @@
     <form id="sign-in"><label>Email address<input name="email" type="email" autocomplete="email" required></label><button type="submit">Email me a sign-in link</button></form>
   </section>
   <div id="workspace" hidden>
-    <nav class="tabs" aria-label="Workspace"><button type="button" data-tab="leads" aria-pressed="true">Opportunities</button><button type="button" data-tab="portfolio" aria-pressed="false">Portfolio</button></nav>
+    <nav class="tabs" aria-label="Workspace"><button type="button" data-tab="leads" aria-pressed="true">Opportunities</button><button type="button" data-tab="projects" aria-pressed="false">Projects</button><button type="button" data-tab="portfolio" aria-pressed="false">Portfolio</button></nav>
     <section id="leads" aria-labelledby="leads-title">
       <div class="toolbar"><div><h2 id="leads-title">Opportunities</h2><p id="lead-count"></p></div><label>Filter<select id="filter"><option value="">All available</option><option value="paid">Posted pay</option><option value="saved">Saved or in progress</option></select></label></div>
       <div id="lead-list" class="cards"></div>
+    </section>
+    <section id="projects" aria-labelledby="projects-title" hidden>
+      <h2 id="projects-title">Lead projects</h2>
+      <div id="project-list" class="cards"></div>
     </section>
     <section id="portfolio" aria-labelledby="portfolio-title" hidden>
       <div class="toolbar"><div><h2 id="portfolio-title">Portfolio references</h2><p>Use tags to match samples to work. Links stay in your workspace.</p></div></div>
@@ -46,11 +50,14 @@
     <h3></h3><p class="company"></p><p class="matches"></p>
     <div class="buttons"><a class="apply" target="_blank" rel="noopener noreferrer">Open original listing ↗</a><button class="edit" type="button">Open pitch</button></div>
     <form class="pitch" hidden>
+      <p class="pitch-version" aria-live="polite"></p>
       <label>Status<select name="status"><option value="saved">Saved</option><option value="drafting">Drafting</option><option value="applied">Applied</option><option value="reply">Replied</option><option value="won">Won</option><option value="closed">Closed</option></select></label>
       <label>Portfolio pitch<textarea name="portfolio" rows="4" maxlength="6000"></textarea></label>
       <label>Scope pitch<textarea name="scope" rows="4" maxlength="6000"></textarea></label>
       <label>Follow-up<textarea name="followup" rows="3" maxlength="6000"></textarea></label>
-      <div class="buttons"><button type="submit">Save drafts and status</button></div>
+      <label>Quote<textarea name="quote" rows="3" maxlength="6000" placeholder="Fee, currency, deliverables, and usage terms"></textarea></label>
+      <div class="buttons"><button type="submit">Save drafts and status</button><button type="button" class="regenerate">Generate new pitch</button></div>
+      <button type="button" class="archive">↓ Archive pitch and quote <small>Tap or swipe down here</small></button>
     </form>
   </article>
 </template>
